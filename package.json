@@ -1,0 +1,12 @@
+{
+  "name": "rfid-doorlock-server",
+  "version": "1.0.0",
+  "description": "Simple file-logging backend for STM32 RFID doorlock system",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
