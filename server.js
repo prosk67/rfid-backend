@@ -16,6 +16,12 @@ if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
 if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR);
 if (!fs.existsSync(USERS_FILE)) fs.writeFileSync(USERS_FILE, JSON.stringify([], null, 2));
 
+app.use(express.static('public'));
+
+app.get('/admin', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+
 // --- helpers ---
 function readUsers() {
   try {
