@@ -102,6 +102,25 @@ app.get('/api/logs/access', (req, res) => {
   res.json(readLogFile(ACCESS_LOG, req.query.limit));
 });
 
+// Read all logs in format: uid | authorization status | timestamp
+app.get('/api/logs', (req, res) => {
+  const logs = readLogFile(ACCESS_LOG, req.query.limit);
+  res.json(logs.map(l => ({
+    uid: l.uid,
+    status: l.status,
+    timestamp: l.timestamp
+  })));
+});
+
+// Create new access log entry
+app.post('/api/logs', (req, res) => {
+  const { uid, status } = req.body;
+  if (!uid || !status) return res.status(400).json({ error: 'uid and status required' });
+
+  appendLog(ACCESS_LOG, { uid, status, name: null });
+  res.json({ ok: true });
+});
+
 // Read intrusion log (last N lines, default 50)
 app.get('/api/logs/intrusion', (req, res) => {
   res.json(readLogFile(INTRUSION_LOG, req.query.limit));
