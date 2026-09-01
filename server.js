@@ -74,7 +74,7 @@ app.post('/api/auth', (req, res) => {
   // Otherwise (denied or non-existent) -> queue for admin approval
   const pending = readPendingAuth();
   if (!pending.some(p => p.uid === uid)) {
-    pending.push({ uid, status: 'pending', created_at: new Date().toISOString() });
+    pending.push({ uid, name: '', status: 'pending', created_at: new Date().toISOString() });
     writePendingAuth(pending);
   }
 
@@ -91,6 +91,7 @@ app.get('/api/auth/pending', (req, res) => {
 // Admin approves a pending auth request
 app.post('/api/auth/approve/:uid', (req, res) => {
   const { uid } = req.params;
+  const { name } = req.body;
 
   const pending = readPendingAuth();
   const idx = pending.findIndex(p => p.uid === uid);
@@ -101,12 +102,13 @@ app.post('/api/auth/approve/:uid', (req, res) => {
   // Check if user already exists
   const users = readUsers();
   if (!users.some(u => u.uid === uid)) {
-    users.push({ uid, name: null, active: true, auth_status: 'Granted', created_at: new Date().toISOString() });
+    users.push({ uid, name: name || pending[idx].name || null, active: true, auth_status: 'Granted', created_at: new Date().toISOString() });
     writeUsers(users);
   } else {
     // Update existing user's status
     const user = users.find(u => u.uid === uid);
     user.active = true;
+    user.name = name || user.name;
     user.auth_status = 'Granted';
     writeUsers(users);
   }
@@ -116,6 +118,24 @@ app.post('/api/auth/approve/:uid', (req, res) => {
   writePendingAuth(pending);
 
   res.json({ ok: true, auth_status: 'Granted' });
+});
+
+// Update name of a pending auth request
+app.post('/api/auth/pending/name/:uid', (req, res) => {
+  const { uid } = req.params;
+  const { name } = req.body;
+  if (name === undefined) return res.status(400).json({ error: 'name required' });
+
+  const pending = readPendingAuth();
+  const idx = pending.findIndex(p => p.uid === uid);
+  if (idx === -1) {
+    return res.status(404).json({ error: 'uid not pending approval' });
+  }
+
+  pending[idx].name = name;
+  writePendingAuth(pending);
+
+  res.json({ ok: true });
 });
 
 // Admin rejects a pending auth request

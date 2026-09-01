@@ -27,7 +27,7 @@
       <h2>Pending Auth Requests</h2>
       <div class="content">
         <button class="btn" onclick="loadPending()">Refresh</button>
-        <table id="pendingTable"><thead><tr><th>UID</th><th>Status</th><th>Created At</th><th>Action</th></tr></thead><tbody class="empty">Loading…</tbody></table>
+        <table id="pendingTable"><thead><tr><th>UID</th><th>Name</th><th>Status</th><th>Created At</th><th>Action</th></tr></thead><tbody class="empty">Loading…</tbody></table>
       </div>
     </div>
 
@@ -92,10 +92,11 @@
     async function loadPending() {
       const data = await fetchJson('/api/auth/pending');
       const tbody = document.querySelector('#pendingTable tbody');
-      if (!data.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty">No pending requests</td></tr>'; return; }
+      if (!data.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">No pending requests</td></tr>'; return; }
       tbody.innerHTML = data.map(e =>
         `<tr>
           <td>${e.uid}</td>
+          <td><input type="text" value="${(e.name || '').replace(/"/g, '&quot;')}" onchange="updatePendingName('${e.uid}', this.value)" style="width:100%; padding:4px; box-sizing:border-box;"></td>
           <td>${e.status}</td>
           <td>${new Date(e.created_at).toLocaleString()}</td>
           <td>
@@ -106,8 +107,24 @@
       ).join('');
     }
 
+    async function updatePendingName(uid, name) {
+      const res = await fetch(`/api/auth/pending/name/${encodeURIComponent(uid)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      });
+      if (!res.ok) console.error('Failed to update name');
+    }
+
     async function approveAuth(uid) {
-      const res = await fetch(`/api/auth/approve/${encodeURIComponent(uid)}`, { method: 'POST' });
+      const row = event.target.closest('tr');
+      const nameInput = row.querySelector('input');
+      const name = nameInput ? nameInput.value : '';
+      const res = await fetch(`/api/auth/approve/${encodeURIComponent(uid)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      });
       if (res.ok) { loadPending(); loadUsers(); }
     }
 
