@@ -62,16 +62,16 @@ app.post('/api/auth', (req, res) => {
   if (!uid) return res.status(400).json({ error: 'uid required' });
 
   const users = readUsers();
-  const user = users.find(u => u.uid === uid && u.active !== false);
+  const user = users.find(u => u.uid === uid);
 
-  if (user) {
-    // User found and active -> granted
+  // Grant access only if user exists and auth_status is "Granted"
+  if (user && user.auth_status === 'Granted') {
     const status = 'granted';
     appendLog(ACCESS_LOG, { uid, status, name: user.name });
     return res.json({ granted: true, name: user.name, auth_status: 'Granted' });
   }
 
-  // User not found -> queue for admin approval (unless already pending)
+  // Otherwise (denied or non-existent) -> queue for admin approval
   const pending = readPendingAuth();
   if (!pending.some(p => p.uid === uid)) {
     pending.push({ uid, status: 'pending', created_at: new Date().toISOString() });
@@ -79,8 +79,8 @@ app.post('/api/auth', (req, res) => {
   }
 
   const status = 'denied';
-  appendLog(ACCESS_LOG, { uid, status, name: null });
-  res.json({ granted: false, name: null, auth_status: 'denied' });
+  appendLog(ACCESS_LOG, { uid, status, name: user ? user.name : null });
+  res.json({ granted: false, name: user ? user.name : null, auth_status: 'denied' });
 });
 
 // List pending auth requests

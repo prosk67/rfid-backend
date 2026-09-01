@@ -35,7 +35,7 @@
       <h2>Enrolled Users</h2>
       <div class="content">
         <button class="btn" onclick="loadUsers()">Refresh</button>
-        <table id="usersTable"><thead><tr><th>UID</th><th>Name</th><th>Active</th><th>Created At</th></tr></thead><tbody class="empty">Loading…</tbody></table>
+        <table id="usersTable"><thead><tr><th>UID</th><th>Name</th><th>Active</th><th>Auth Status</th><th>Created At</th><th>Action</th></tr></thead><tbody class="empty">Loading…</tbody></table>
       </div>
     </div>
 
@@ -66,8 +66,13 @@
     async function loadUsers() {
       const data = await fetchJson('/api/users');
       const tbody = document.querySelector('#usersTable tbody');
-      if (!data.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">No users enrolled</td></tr>'; return; }
-      tbody.innerHTML = data.map(u => `<tr><td>${u.uid}</td><td>${u.name || ''}</td><td>${u.active !== false ? 'yes' : 'no'}</td><td>${u.created_at ? new Date(u.created_at).toLocaleString() : ''}</td></tr>`).join('');
+      if (!data.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty">No users enrolled</td></tr>'; return; }
+      tbody.innerHTML = data.map(u => `<tr><td>${u.uid}</td><td>${u.name || ''}</td><td>${u.active !== false ? 'yes' : 'no'}</td><td>${u.auth_status || ''}</td><td>${u.created_at ? new Date(u.created_at).toLocaleString() : ''}</td><td><button class="btn" style="background:#cc0000;" onclick="deleteUser('${u.uid}')">Delete</button></td></tr>`).join('');
+    }
+
+    async function deleteUser(uid) {
+      const res = await fetch(`/api/users/${encodeURIComponent(uid)}`, { method: 'DELETE' });
+      if (res.ok) { loadUsers(); }
     }
 
     async function loadAccessLog() {
