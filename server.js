@@ -8,6 +8,7 @@ app.use(express.json());
 const DATA_DIR = path.join(__dirname, 'data');
 const LOG_DIR = path.join(__dirname, 'logs');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
+const PENDING_AUTH_FILE = path.join(DATA_DIR, 'pending_auth.json');
 const ACCESS_LOG = path.join(LOG_DIR, 'access.log');
 const INTRUSION_LOG = path.join(LOG_DIR, 'intrusion.log');
 
@@ -15,6 +16,7 @@ const INTRUSION_LOG = path.join(LOG_DIR, 'intrusion.log');
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
 if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR);
 if (!fs.existsSync(USERS_FILE)) fs.writeFileSync(USERS_FILE, JSON.stringify([], null, 2));
+if (!fs.existsSync(PENDING_AUTH_FILE)) fs.writeFileSync(PENDING_AUTH_FILE, JSON.stringify([], null, 2));
 
 app.use(express.static('public'));
 
@@ -35,6 +37,18 @@ function writeUsers(users) {
   fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
 }
 
+function readPendingAuth() {
+  try {
+    return JSON.parse(fs.readFileSync(PENDING_AUTH_FILE, 'utf8'));
+  } catch (e) {
+    return [];
+  }
+}
+
+function writePendingAuth(requests) {
+  fs.writeFileSync(PENDING_AUTH_FILE, JSON.stringify(requests, null, 2));
+}
+
 function appendLog(filePath, entry) {
   const line = JSON.stringify({ ...entry, timestamp: new Date().toISOString() }) + '\n';
   fs.appendFileSync(filePath, line);
@@ -50,10 +64,74 @@ app.post('/api/auth', (req, res) => {
   const users = readUsers();
   const user = users.find(u => u.uid === uid && u.active !== false);
 
-  const status = user ? 'granted' : 'denied';
-  appendLog(ACCESS_LOG, { uid, status, name: user ? user.name : null });
+  if (user) {
+    // User found and active -> granted
+    const status = 'granted';
+    appendLog(ACCESS_LOG, { uid, status, name: user.name });
+    return res.json({ granted: true, name: user.name, auth_status: 'Granted' });
+  }
 
-  res.json({ granted: !!user, name: user ? user.name : null });
+  // User not found -> queue for admin approval (unless already pending)
+  const pending = readPendingAuth();
+  if (!pending.some(p => p.uid === uid)) {
+    pending.push({ uid, status: 'pending', created_at: new Date().toISOString() });
+    writePendingAuth(pending);
+  }
+
+  const status = 'denied';
+  appendLog(ACCESS_LOG, { uid, status, name: null });
+  res.json({ granted: false, name: null, auth_status: 'denied' });
+});
+
+// List pending auth requests
+app.get('/api/auth/pending', (req, res) => {
+  res.json(readPendingAuth());
+});
+
+// Admin approves a pending auth request
+app.post('/api/auth/approve/:uid', (req, res) => {
+  const { uid } = req.params;
+
+  const pending = readPendingAuth();
+  const idx = pending.findIndex(p => p.uid === uid);
+  if (idx === -1) {
+    return res.status(404).json({ error: 'uid not pending approval' });
+  }
+
+  // Check if user already exists
+  const users = readUsers();
+  if (!users.some(u => u.uid === uid)) {
+    users.push({ uid, name: null, active: true, auth_status: 'Granted', created_at: new Date().toISOString() });
+    writeUsers(users);
+  } else {
+    // Update existing user's status
+    const user = users.find(u => u.uid === uid);
+    user.active = true;
+    user.auth_status = 'Granted';
+    writeUsers(users);
+  }
+
+  // Remove from pending queue
+  pending.splice(idx, 1);
+  writePendingAuth(pending);
+
+  res.json({ ok: true, auth_status: 'Granted' });
+});
+
+// Admin rejects a pending auth request
+app.post('/api/auth/reject/:uid', (req, res) => {
+  const { uid } = req.params;
+
+  const pending = readPendingAuth();
+  const idx = pending.findIndex(p => p.uid === uid);
+  if (idx === -1) {
+    return res.status(404).json({ error: 'uid not pending approval' });
+  }
+
+  pending.splice(idx, 1);
+  writePendingAuth(pending);
+
+  res.json({ ok: true, auth_status: 'denied' });
 });
 
 // Admin enrolls new RFID from STM keypad/OLED flow
@@ -66,7 +144,8 @@ app.post('/api/users', (req, res) => {
     return res.status(409).json({ error: 'uid already exists' });
   }
 
-  users.push({ uid, name: name || null, active: true, created_at: new Date().toISOString() });
+  const auth_status = 'Granted';
+  users.push({ uid, name: name || null, active: true, auth_status, created_at: new Date().toISOString() });
   writeUsers(users);
 
   res.json({ ok: true });

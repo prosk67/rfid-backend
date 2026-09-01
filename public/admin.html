@@ -24,6 +24,14 @@
     <h1>RFID Admin Panel</h1>
 
     <div class="section">
+      <h2>Pending Auth Requests</h2>
+      <div class="content">
+        <button class="btn" onclick="loadPending()">Refresh</button>
+        <table id="pendingTable"><thead><tr><th>UID</th><th>Status</th><th>Created At</th><th>Action</th></tr></thead><tbody class="empty">Loading…</tbody></table>
+      </div>
+    </div>
+
+    <div class="section">
       <h2>Enrolled Users</h2>
       <div class="content">
         <button class="btn" onclick="loadUsers()">Refresh</button>
@@ -76,7 +84,34 @@
       tbody.innerHTML = data.map(e => `<tr><td>${e.sensor}</td><td>${new Date(e.timestamp).toLocaleString()}</td></tr>`).join('');
     }
 
-    loadUsers(); loadAccessLog(); loadIntrusionLog();
+    async function loadPending() {
+      const data = await fetchJson('/api/auth/pending');
+      const tbody = document.querySelector('#pendingTable tbody');
+      if (!data.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty">No pending requests</td></tr>'; return; }
+      tbody.innerHTML = data.map(e =>
+        `<tr>
+          <td>${e.uid}</td>
+          <td>${e.status}</td>
+          <td>${new Date(e.created_at).toLocaleString()}</td>
+          <td>
+            <button class="btn" onclick="approveAuth('${e.uid}')">Approve</button>
+            <button class="btn" style="background:#cc0000;" onclick="rejectAuth('${e.uid}')">Reject</button>
+          </td>
+        </tr>`
+      ).join('');
+    }
+
+    async function approveAuth(uid) {
+      const res = await fetch(`/api/auth/approve/${encodeURIComponent(uid)}`, { method: 'POST' });
+      if (res.ok) { loadPending(); loadUsers(); }
+    }
+
+    async function rejectAuth(uid) {
+      const res = await fetch(`/api/auth/reject/${encodeURIComponent(uid)}`, { method: 'POST' });
+      if (res.ok) { loadPending(); }
+    }
+
+    loadUsers(); loadAccessLog(); loadIntrusionLog(); loadPending();
   </script>
 </body>
 </html>
