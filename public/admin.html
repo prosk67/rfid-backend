@@ -3,58 +3,256 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RFID Admin Panel</title>
+  <title>RFID Access Control</title>
   <style>
-    body {font-family: Arial, sans-serif; margin: 2rem; background:#f5f5f5;}
-    .container {max-width: 1200px; margin: 0 auto;}
-    h1 {text-align: center; margin-bottom: 1rem;}
-    .section {background:#fff; margin-bottom: 2rem; border-radius: 8px; overflow: hidden;}
-    .section h2 {background:#0066cc; color:#fff; margin:0; padding: 0.75rem; margin:-1px -1px 0;}
-    .content {padding: 1rem;}
-    table {width:100%; border-collapse: collapse; margin-top: 0.5rem;}
-    th, td {border: 1px solid #ddd; padding: 0.5rem; text-align: left;}
-    th {background:#f0f0f0;}
-    .btn {display:inline-block; background:#0066cc; color:#fff; padding:0.5rem 1rem; border:none; border-radius:4px; cursor:pointer; margin-right:0.5rem;}
-    .btn:hover {background:#0055aa;}
-    .empty {color:#888; font-style:italic;}
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --danger: #dc2626;
+      --danger-dark: #b91c1c;
+      --success: #059669;
+      --warning: #d97706;
+      --bg: #f1f5f9;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --radius: 12px;
+      --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-lg: 0 10px 25px rgba(0,0,0,0.1);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    header {
+      background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+      color: #fff;
+      padding: 1.5rem 2rem;
+      box-shadow: var(--shadow-lg);
+    }
+    header h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; }
+    header p { font-size: 0.9rem; opacity: 0.85; margin-top: 0.25rem; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .stat-card {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+    }
+    .stat-card .label { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+    .stat-card .value { font-size: 2rem; font-weight: 700; margin-top: 0.25rem; }
+    .stat-card .value.pending { color: var(--warning); }
+    .stat-card .value.granted { color: var(--success); }
+
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      margin-bottom: 2rem;
+      overflow: hidden;
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      background: #f8fafc;
+    }
+    .card-header h2 { font-size: 1.1rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; }
+    .card-body { padding: 1.5rem; overflow-x: auto; }
+    .card-header .badge {
+      background: var(--primary);
+      color: #fff;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.15rem 0.6rem;
+      border-radius: 999px;
+    }
+    .card-header .badge.pending { background: var(--warning); }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    th {
+      text-align: left;
+      padding: 0.75rem 1rem;
+      color: var(--muted);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 600;
+      border-bottom: 2px solid var(--border);
+      white-space: nowrap;
+    }
+    td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: #f8fafc; }
+    .uid { font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace; font-weight: 500; }
+
+    .badge-status {
+      display: inline-block;
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+    .badge-status.granted, .badge-status.granted-it, .badge-status.yes { background: #d1fae5; color: var(--success); }
+    .badge-status.denied, .badge-status.denied-it, .badge-status.no { background: #fee2e2; color: var(--danger); }
+    .badge-status.pending { background: #fef3c7; color: var(--warning); }
+    .badge-status.active { background: #dbeafe; color: var(--primary); }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.45rem 0.9rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 600;
+      transition: all 0.15s ease;
+      color: #fff;
+    }
+    .btn-blue { background: var(--primary); }
+    .btn-blue:hover { background: var(--primary-dark); }
+    .btn-danger { background: var(--danger); }
+    .btn-danger:hover { background: var(--danger-dark); }
+    .btn-success { background: var(--success); }
+    .btn-success:hover { background: #047857; }
+    .btn-sm { padding: 0.3rem 0.7rem; font-size: 0.75rem; }
+    .btn-outline { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+    .btn-outline:hover { background: #f1f5f9; color: var(--text); }
+
+    .name-input {
+      width: 100%;
+      padding: 0.4rem 0.6rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.85rem;
+      min-width: 120px;
+      transition: border-color 0.15s;
+    }
+    .name-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+
+    .actions { display: flex; gap: 0.4rem; }
+    .empty { color: var(--muted); font-style: italic; text-align: center; padding: 2rem !important; }
+    .empty svg { display: block; margin: 0 auto 0.5rem; }
+
+    .toast {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      background: var(--text);
+      color: #fff;
+      padding: 0.75rem 1.25rem;
+      border-radius: 8px;
+      box-shadow: var(--shadow-lg);
+      font-size: 0.9rem;
+      z-index: 1000;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all 0.2s ease;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    @media (max-width: 768px) {
+      .container { padding: 1rem; }
+      .card-body { padding: 1rem; }
+      th, td { padding: 0.5rem; }
+    }
   </style>
 </head>
 <body>
+  <header>
+    <h1>RFID Access Control</h1>
+    <p>Admin Dashboard</p>
+  </header>
+
   <div class="container">
-    <h1>RFID Admin Panel</h1>
-
-    <div class="section">
-      <h2>Pending Auth Requests</h2>
-      <div class="content">
-        <button class="btn" onclick="loadPending()">Refresh</button>
-        <table id="pendingTable"><thead><tr><th>UID</th><th>Name</th><th>Status</th><th>Created At</th><th>Action</th></tr></thead><tbody class="empty">Loading…</tbody></table>
+    <div class="stats">
+      <div class="stat-card">
+        <div class="label">Pending Requests</div>
+        <div class="value pending" id="statPending">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Enrolled Users</div>
+        <div class="value" id="statUsers">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Access Events</div>
+        <div class="value granted" id="statAccess">0</div>
       </div>
     </div>
 
-    <div class="section">
-      <h2>Enrolled Users</h2>
-      <div class="content">
-        <button class="btn" onclick="loadUsers()">Refresh</button>
-        <table id="usersTable"><thead><tr><th>UID</th><th>Name</th><th>Active</th><th>Auth Status</th><th>Created At</th><th>Action</th></tr></thead><tbody class="empty">Loading…</tbody></table>
+    <div class="card">
+      <div class="card-header">
+        <h2>Pending Auth Requests <span class="badge pending" id="pendingCount">0</span></h2>
+        <button class="btn btn-outline" onclick="loadPending()">↻ Refresh</button>
+      </div>
+      <div class="card-body">
+        <table id="pendingTable">
+          <thead><tr><th>UID</th><th>Name</th><th>Status</th><th>Created At</th><th>Action</th></tr></thead>
+          <tbody><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+        </table>
       </div>
     </div>
 
-    <div class="section">
-      <h2>Access Log (Last 50)</h2>
-      <div class="content">
-        <button class="btn" onclick="loadAccessLog()">Refresh</button>
-        <table id="accessTable"><thead><tr><th>UID</th><th>Status</th><th>Name</th><th>Timestamp</th></tr></thead><tbody class="empty">Loading…</tbody></table>
+    <div class="card">
+      <div class="card-header">
+        <h2>Enrolled Users <span class="badge" id="userCount">0</span></h2>
+        <button class="btn btn-outline" onclick="loadUsers()">↻ Refresh</button>
+      </div>
+      <div class="card-body">
+        <table id="usersTable">
+          <thead><tr><th>UID</th><th>Name</th><th>Status</th><th>Created At</th><th>Action</th></tr></thead>
+          <tbody><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+        </table>
       </div>
     </div>
 
-    <div class="section">
-      <h2>Intrusion Log (Last 50)</h2>
-      <div class="content">
-        <button class="btn" onclick="loadIntrusionLog()">Refresh</button>
-        <table id="intrusionTable"><thead><tr><th>Sensor</th><th>Timestamp</th></tr></thead><tbody class="empty">Loading…</tbody></table>
+    <div class="card">
+      <div class="card-header">
+        <h2>Access Log <span class="badge" id="accessCount">0</span></h2>
+        <button class="btn btn-outline" onclick="loadAccessLog()">↻ Refresh</button>
+      </div>
+      <div class="card-body">
+        <table id="accessTable">
+          <thead><tr><th>UID</th><th>Status</th><th>Name</th><th>Timestamp</th></tr></thead>
+          <tbody><tr><td colspan="4" class="empty">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2>Intrusion Log <span class="badge" id="intrusionCount">0</span></h2>
+        <button class="btn btn-outline" onclick="loadIntrusionLog()">↻ Refresh</button>
+      </div>
+      <div class="card-body">
+        <table id="intrusionTable">
+          <thead><tr><th>Sensor</th><th>Timestamp</th></tr></thead>
+          <tbody><tr><td colspan="2" class="empty">Loading…</td></tr></tbody>
+        </table>
       </div>
     </div>
   </div>
+
+  <div class="toast" id="toast"></div>
 
   <script>
     async function fetchJson(url) {
@@ -63,46 +261,85 @@
       return res.json();
     }
 
+    function toast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 2000);
+    }
+
+    function statusBadge(status) {
+      const norm = (status || '').toLowerCase();
+      let cls = 'badge-status';
+      if (norm === 'granted' || norm === 'active' || norm === 'yes') cls += ' granted';
+      else if (norm === 'denied' || norm === 'no') cls += ' denied';
+      else if (norm === 'pending') cls += ' pending';
+      else cls += ' active';
+      return `<span class="${cls}">${status || '—'}</span>`;
+    }
+
     async function loadUsers() {
       const data = await fetchJson('/api/users');
+      document.getElementById('userCount').textContent = data.length;
+      document.getElementById('statUsers').textContent = data.length;
       const tbody = document.querySelector('#usersTable tbody');
-      if (!data.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty">No users enrolled</td></tr>'; return; }
-      tbody.innerHTML = data.map(u => `<tr><td>${u.uid}</td><td>${u.name || ''}</td><td>${u.active !== false ? 'yes' : 'no'}</td><td>${u.auth_status || ''}</td><td>${u.created_at ? new Date(u.created_at).toLocaleString() : ''}</td><td><button class="btn" style="background:#cc0000;" onclick="deleteUser('${u.uid}')">Delete</button></td></tr>`).join('');
+      if (!data.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">No users enrolled</td></tr>'; return; }
+      tbody.innerHTML = data.map(u => `<tr>
+        <td class="uid">${u.uid}</td>
+        <td>${u.name || '<span style="color:var(--muted)">—</span>'}</td>
+        <td>${statusBadge(u.auth_status || 'active')}</td>
+        <td>${u.created_at ? new Date(u.created_at).toLocaleString() : '—'}</td>
+        <td><div class="actions"><button class="btn btn-danger btn-sm" onclick="deleteUser('${u.uid}')">Delete</button></div></td>
+      </tr>`).join('');
     }
 
     async function deleteUser(uid) {
+      if (!confirm(`Delete user ${uid}?`)) return;
       const res = await fetch(`/api/users/${encodeURIComponent(uid)}`, { method: 'DELETE' });
-      if (res.ok) { loadUsers(); }
+      if (res.ok) { toast('User deleted'); loadUsers(); loadPending(); }
     }
 
     async function loadAccessLog() {
-      const data = await fetchJson('/api/logs/access');
+      const data = await fetchJson('/api/logs/access?limit=50');
+      document.getElementById('statAccess').textContent = data.length;
+      document.getElementById('accessCount').textContent = data.length;
       const tbody = document.querySelector('#accessTable tbody');
       if (!data.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty">No access events</td></tr>'; return; }
-      tbody.innerHTML = data.map(e => `<tr><td>${e.uid}</td><td>${e.status}</td><td>${e.name || ''}</td><td>${new Date(e.timestamp).toLocaleString()}</td></tr>`).join('');
+      tbody.innerHTML = data.map(e => `<tr>
+        <td class="uid">${e.uid}</td>
+        <td>${statusBadge(e.status)}</td>
+        <td>${e.name || '<span style="color:var(--muted)">—</span>'}</td>
+        <td>${new Date(e.timestamp).toLocaleString()}</td>
+      </tr>`).join('');
     }
 
     async function loadIntrusionLog() {
-      const data = await fetchJson('/api/logs/intrusion');
+      const data = await fetchJson('/api/logs/intrusion?limit=50');
+      document.getElementById('intrusionCount').textContent = data.length;
       const tbody = document.querySelector('#intrusionTable tbody');
       if (!data.length) { tbody.innerHTML = '<tr><td colspan="2" class="empty">No intrusion events</td></tr>'; return; }
-      tbody.innerHTML = data.map(e => `<tr><td>${e.sensor}</td><td>${new Date(e.timestamp).toLocaleString()}</td></tr>`).join('');
+      tbody.innerHTML = data.map(e => `<tr>
+        <td class="uid">${e.sensor}</td>
+        <td>${new Date(e.timestamp).toLocaleString()}</td>
+      </tr>`).join('');
     }
 
     async function loadPending() {
       const data = await fetchJson('/api/auth/pending');
+      document.getElementById('pendingCount').textContent = data.length;
+      document.getElementById('statPending').textContent = data.length;
       const tbody = document.querySelector('#pendingTable tbody');
       if (!data.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">No pending requests</td></tr>'; return; }
       tbody.innerHTML = data.map(e =>
         `<tr>
-          <td>${e.uid}</td>
-          <td><input type="text" value="${(e.name || '').replace(/"/g, '&quot;')}" onchange="updatePendingName('${e.uid}', this.value)" style="width:100%; padding:4px; box-sizing:border-box;"></td>
-          <td>${e.status}</td>
+          <td class="uid">${e.uid}</td>
+          <td><input type="text" class="name-input" value="${(e.name || '').replace(/"/g, '&quot;')}" onchange="updatePendingName('${e.uid}', this.value)" placeholder="Enter name..."></td>
+          <td>${statusBadge(e.status)}</td>
           <td>${new Date(e.created_at).toLocaleString()}</td>
-          <td>
-            <button class="btn" onclick="approveAuth('${e.uid}')">Approve</button>
-            <button class="btn" style="background:#cc0000;" onclick="rejectAuth('${e.uid}')">Reject</button>
-          </td>
+          <td><div class="actions">
+            <button class="btn btn-success btn-sm" onclick="approveAuth('${e.uid}')">✓ Approve</button>
+            <button class="btn btn-danger btn-sm" onclick="rejectAuth('${e.uid}')">✕ Reject</button>
+          </div></td>
         </tr>`
       ).join('');
     }
@@ -113,7 +350,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name })
       });
-      if (!res.ok) console.error('Failed to update name');
+      if (!res.ok) { toast('Failed to update name'); }
     }
 
     async function approveAuth(uid) {
@@ -125,12 +362,12 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name })
       });
-      if (res.ok) { loadPending(); loadUsers(); }
+      if (res.ok) { toast('Access granted'); loadPending(); loadUsers(); }
     }
 
     async function rejectAuth(uid) {
       const res = await fetch(`/api/auth/reject/${encodeURIComponent(uid)}`, { method: 'POST' });
-      if (res.ok) { loadPending(); }
+      if (res.ok) { toast('Request rejected'); loadPending(); }
     }
 
     loadUsers(); loadAccessLog(); loadIntrusionLog(); loadPending();
