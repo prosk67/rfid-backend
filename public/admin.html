@@ -36,6 +36,8 @@
     }
     header h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; }
     header p { font-size: 0.9rem; opacity: 0.85; margin-top: 0.25rem; }
+    .header-logout { background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.4); }
+    .header-logout:hover { background: rgba(255,255,255,0.25); color: #fff; }
     .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
 
     .stats {
@@ -179,8 +181,13 @@
 </head>
 <body>
   <header>
-    <h1>RFID Access Control</h1>
-    <p>Admin Dashboard</p>
+    <div style="display:flex; align-items:center; justify-content:space-between;">
+      <div>
+        <h1>RFID Access Control</h1>
+        <p>Admin Dashboard</p>
+      </div>
+      <button class="btn btn-outline header-logout" onclick="logout()">Log out</button>
+    </div>
   </header>
 
   <div class="container">
@@ -257,8 +264,16 @@
   <script>
     async function fetchJson(url) {
       const res = await fetch(url);
+      if (res.status === 401) { window.location.href = '/login'; throw new Error('unauthorized'); }
       if (!res.ok) throw new Error('Network error');
       return res.json();
+    }
+
+    async function logout() {
+      try {
+        await fetch('/api/logout', { method: 'POST', credentials: 'same-origin' });
+      } catch (e) { /* ignore */ }
+      window.location.href = '/login';
     }
 
     function toast(msg) {
