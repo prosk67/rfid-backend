@@ -370,7 +370,26 @@
       if (res.ok) { toast('Request rejected'); loadPending(); }
     }
 
+    // --- real-time via Server-Sent Events ---
+    function connectEvents() {
+      const es = new EventSource('/api/events');
+
+      es.addEventListener('hello', () => {
+        console.log('SSE connected');
+      });
+
+      es.addEventListener('access', () => { loadAccessLog(); });
+      es.addEventListener('pending', () => { loadPending(); });
+      es.addEventListener('users', () => { loadUsers(); });
+      es.addEventListener('intrusion', () => { loadIntrusionLog(); });
+
+      es.onerror = () => {
+        // EventSource auto-reconnects; nothing needed here
+      };
+    }
+
     loadUsers(); loadAccessLog(); loadIntrusionLog(); loadPending();
+    connectEvents();
   </script>
 </body>
 </html>

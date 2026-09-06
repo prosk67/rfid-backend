@@ -54,6 +54,20 @@ function appendLog(filePath, entry) {
   fs.appendFileSync(filePath, line);
 }
 
+// --- SSE / real-time ---
+const sseClients = new Set();
+
+function broadcast(channel, payload) {
+  const data = JSON.stringify({ channel, payload });
+  for (const client of sseClients) {
+    try {
+      client.res.write(`event: ${channel}\ndata: ${data}\n\n`);
+    } catch (e) {
+      sseClients.delete(client);
+    }
+  }
+}
+
 // --- routes ---
 
 // STM sends scanned UID -> check against users.json, log result
@@ -68,6 +82,7 @@ app.post('/api/auth', (req, res) => {
   if (user && user.auth_status === 'Granted') {
     const status = 'granted';
     appendLog(ACCESS_LOG, { uid, status, name: user.name });
+    broadcast('access', { uid, status, name: user.name, granted: true });
     return res.json({ granted: true, name: user.name, auth_status: 'Granted' });
   }
 
@@ -80,6 +95,8 @@ app.post('/api/auth', (req, res) => {
 
   const status = 'denied';
   appendLog(ACCESS_LOG, { uid, status, name: user ? user.name : null });
+  broadcast('access', { uid, status, name: user ? user.name : null, granted: false });
+  broadcast('pending', { action: 'add', uid });
   res.json({ granted: false, name: user ? user.name : null, auth_status: 'denied' });
 });
 
@@ -117,6 +134,8 @@ app.post('/api/auth/approve/:uid', (req, res) => {
   pending.splice(idx, 1);
   writePendingAuth(pending);
 
+  broadcast('pending', { action: 'remove', uid });
+  broadcast('users', { action: 'approve', uid });
   res.json({ ok: true, auth_status: 'Granted' });
 });
 
@@ -135,6 +154,7 @@ app.post('/api/auth/pending/name/:uid', (req, res) => {
   pending[idx].name = name;
   writePendingAuth(pending);
 
+  broadcast('pending', { action: 'name', uid });
   res.json({ ok: true });
 });
 
@@ -151,6 +171,7 @@ app.post('/api/auth/reject/:uid', (req, res) => {
   pending.splice(idx, 1);
   writePendingAuth(pending);
 
+  broadcast('pending', { action: 'remove', uid });
   res.json({ ok: true, auth_status: 'denied' });
 });
 
@@ -168,6 +189,7 @@ app.post('/api/users', (req, res) => {
   users.push({ uid, name: name || null, active: true, auth_status, created_at: new Date().toISOString() });
   writeUsers(users);
 
+  broadcast('users', { action: 'add', uid });
   res.json({ ok: true });
 });
 
@@ -184,6 +206,7 @@ app.delete('/api/users/:uid', (req, res) => {
     return res.status(404).json({ error: 'uid not found' });
   }
   writeUsers(filtered);
+  broadcast('users', { action: 'remove', uid: req.params.uid });
   res.json({ ok: true });
 });
 
@@ -193,6 +216,7 @@ app.post('/api/intrusion', (req, res) => {
   if (!sensor) return res.status(400).json({ error: 'sensor required' });
 
   appendLog(INTRUSION_LOG, { sensor });
+  broadcast('intrusion', { sensor });
   res.json({ ok: true });
 });
 
@@ -217,12 +241,33 @@ app.post('/api/logs', (req, res) => {
   if (!uid || !status) return res.status(400).json({ error: 'uid and status required' });
 
   appendLog(ACCESS_LOG, { uid, status, name: null });
+  broadcast('access', { uid, status, name: null, granted: status === 'granted' });
   res.json({ ok: true });
 });
 
 // Read intrusion log (last N lines, default 50)
 app.get('/api/logs/intrusion', (req, res) => {
   res.json(readLogFile(INTRUSION_LOG, req.query.limit));
+});
+
+// Server-Sent Events stream for real-time updates
+app.get('/api/events', (req, res) => {
+  res.set({
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+  });
+  res.flushHeaders();
+
+  const client = { res };
+  sseClients.add(client);
+
+  // Send a hello message to confirm connection
+  res.write('event: hello\ndata: {"channel":"hello"}\n\n');
+
+  req.on('close', () => {
+    sseClients.delete(client);
+  });
 });
 
 function readLogFile(filePath, limit) {
