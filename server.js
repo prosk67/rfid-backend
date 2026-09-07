@@ -338,7 +338,7 @@ app.get('/api/logs', authRequired, (req, res) => {
 });
 
 // Create new access log entry
-app.post('/api/logs', authRequired, (req, res) => {
+app.post('/api/logs', (req, res) => {
   const { uid, status } = req.body;
   if (!uid || !status) return res.status(400).json({ error: 'uid and status required' });
 
